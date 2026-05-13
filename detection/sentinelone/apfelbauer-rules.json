@@ -1,0 +1,51 @@
+[
+  {
+    "name": "apfelbauer: Silent Apple Intelligence Enablement via defaults write",
+    "description": "Detects writes to com.apple.CloudSubscriptionFeatures.optIn, which silently enables Apple Intelligence. This preference is not written by any legitimate process outside of System Settings.",
+    "severity": "Critical",
+    "mitre_attack": "T1562.001",
+    "query": "EventType = \"Process Creation\" AND TgtProcName = \"defaults\" AND TgtProcCmdLine ContainsCIS \"write\" AND TgtProcCmdLine ContainsCIS \"com.apple.CloudSubscriptionFeatures.optIn\""
+  },
+  {
+    "name": "apfelbauer: DSID Harvesting via MobileMeAccounts Read",
+    "description": "Detects non-Settings processes reading MobileMeAccounts preferences to extract the DSID, used to construct the DSID-keyed opt-in key for Apple Intelligence enablement bypass on macOS 26.4+.",
+    "severity": "High",
+    "mitre_attack": "T1552.001",
+    "query": "EventType = \"Process Creation\" AND TgtProcName = \"defaults\" AND TgtProcCmdLine ContainsCIS \"read\" AND TgtProcCmdLine ContainsCIS \"MobileMeAccounts\" AND SrcProcName NOT IN (\"System Settings\",\"systempreferences\",\"ManagedClient\",\"mdmclient\")"
+  },
+  {
+    "name": "apfelbauer: Darwin Notification Trigger for AI Enablement",
+    "description": "Detects use of notifyutil to post the CloudSubscriptionFeatures.OptIn.Changed Darwin notification, which forces the daemon to re-evaluate the (attacker-written) enablement preference.",
+    "severity": "Critical",
+    "mitre_attack": "T1562.001",
+    "query": "EventType = \"Process Creation\" AND TgtProcName = \"notifyutil\" AND TgtProcCmdLine ContainsCIS \"-p\" AND TgtProcCmdLine ContainsCIS \"com.apple.CloudSubscriptionFeatures.OptIn.Changed\""
+  },
+  {
+    "name": "apfelbauer: FoundationModels Framework Load from Unsigned Process",
+    "description": "Detects loading of FoundationModels.framework by processes that are not Apple-signed. The framework provides zero-permission LLM access with tool execution capability.",
+    "severity": "High",
+    "mitre_attack": "T1059.004",
+    "query": "EventType = \"Module Load\" AND ModulePath ContainsCIS \"FoundationModels.framework\" AND SrcProcSignerType != \"Apple\" AND SrcProcName NOT IN (\"Siri\",\"siriinferenced\",\"siriactionsd\",\"Shortcuts\",\"Xcode\")"
+  },
+  {
+    "name": "apfelbauer: Swift Interpreter from Non-Xcode Parent",
+    "description": "Detects /usr/bin/swift being invoked by a scripting interpreter or shell, indicating potential abuse of Swift as a bridge to FoundationModels.framework. Legitimate Swift CLI use typically comes from Xcode toolchain processes.",
+    "severity": "Medium",
+    "mitre_attack": "T1059.004",
+    "query": "EventType = \"Process Creation\" AND TgtProcName = \"swift\" AND TgtProcImagePath = \"/usr/bin/swift\" AND SrcProcName IN (\"python3\",\"python\",\"bash\",\"zsh\",\"sh\",\"ruby\",\"perl\",\"node\",\"osascript\") AND SrcProcParentName NOT IN (\"Xcode\",\"xcodebuild\",\"xcrun\")"
+  },
+  {
+    "name": "apfelbauer: Writes to generativeexperiencesd Prefs (Probe Indicator)",
+    "description": "Detects writes to com.apple.generativeexperiencesd preferences. This preference domain is user-writable, but static analysis of the dylib the daemon runs (GenerativeExperiencesRuntime, macOS 26.5 Beta) does NOT confirm any key in this domain (e.g. disableToolBoxAllowList, inputValidation, safetyMode, bypassTranscriptWriteRedaction) is read by the daemon. Treat as a LOW-CONFIDENCE indicator of attacker probing, not a confirmed safety-control bypass.",
+    "severity": "Low",
+    "mitre_attack": "T1647",
+    "query": "EventType = \"Process Creation\" AND TgtProcName = \"defaults\" AND TgtProcCmdLine ContainsCIS \"write\" AND TgtProcCmdLine ContainsCIS \"com.apple.generativeexperiencesd\""
+  },
+  {
+    "name": "apfelbauer: Rapid Sequential Shell Execution from Swift",
+    "description": "Detects a pattern of multiple rapid child process creations from the Swift interpreter, consistent with LLM tool callbacks executing shell commands. The on-device model generates and executes commands in quick succession.",
+    "severity": "Medium",
+    "mitre_attack": "T1059.004",
+    "query": "EventType = \"Process Creation\" AND SrcProcName = \"swift\" AND SrcProcImagePath = \"/usr/bin/swift\" AND TgtProcName IN (\"sh\",\"bash\",\"zsh\",\"cat\",\"ls\",\"find\",\"curl\",\"whoami\",\"hostname\",\"env\",\"grep\",\"awk\",\"sed\",\"defaults\",\"security\",\"dscl\") | count by SrcProcPID having count >= 3"
+  }
+]

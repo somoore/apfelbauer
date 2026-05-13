@@ -1,0 +1,134 @@
+| ============================================================================
+| apfelbauer Detection Rules for Splunk
+| Targeting Apple Intelligence enablement primitives and related framework-access patterns
+| ============================================================================
+| Data model: Splunk CIM Endpoint fields (process_name, process_path,
+| command_line, parent_process_name, parent_process_path, dest, _time)
+| Adjust field names for your data source (FDR, osquery, Jamf Protect, etc.)
+| ============================================================================
+
+
+| ----------------------------------------------------------------------------
+| Rule 1: Silent Apple Intelligence Enablement via defaults write
+| Name: apfelbauer - Silent AI Enablement (CloudSubscriptionFeatures)
+| Description: Detects writes to com.apple.CloudSubscriptionFeatures.optIn
+|   via the defaults command. This preference silently enables Apple
+|   Intelligence and is not written by legitimate software.
+| Severity: Critical
+| MITRE ATT&CK: T1562.001 - Disable or Modify Tools
+| ----------------------------------------------------------------------------
+
+index=endpoint sourcetype=*endpoint* process_name="defaults"
+  (command_line="*write*" AND command_line="*com.apple.CloudSubscriptionFeatures.optIn*")
+| table _time dest user parent_process_name process_name command_line
+| sort - _time
+
+
+| ----------------------------------------------------------------------------
+| Rule 2: DSID Harvesting via MobileMeAccounts Read
+| Name: apfelbauer - DSID Harvesting (MobileMeAccounts)
+| Description: Detects non-Settings processes reading MobileMeAccounts
+|   preferences to extract the DSID for the Apple Intelligence enablement
+|   bypass on macOS 26.4+.
+| Severity: High
+| MITRE ATT&CK: T1552.001 - Credentials in Files
+| ----------------------------------------------------------------------------
+
+index=endpoint sourcetype=*endpoint* process_name="defaults"
+  (command_line="*read*" AND command_line="*MobileMeAccounts*")
+  NOT parent_process_name IN ("System Settings","systempreferences","ManagedClient","mdmclient")
+| table _time dest user parent_process_name process_name command_line
+| sort - _time
+
+
+| ----------------------------------------------------------------------------
+| Rule 3: Darwin Notification Trigger for AI Enablement
+| Name: apfelbauer - Darwin Notification Trigger (OptIn.Changed)
+| Description: Detects use of notifyutil to post the
+|   CloudSubscriptionFeatures.OptIn.Changed Darwin notification, which forces
+|   the daemon to re-evaluate the attacker-written enablement preference.
+|  
+| Severity: Critical
+| MITRE ATT&CK: T1562.001 - Disable or Modify Tools
+| ----------------------------------------------------------------------------
+
+index=endpoint sourcetype=*endpoint* process_name="notifyutil"
+  (command_line="*-p*" AND command_line="*com.apple.CloudSubscriptionFeatures.OptIn.Changed*")
+| table _time dest user parent_process_name process_name command_line
+| sort - _time
+
+
+| ----------------------------------------------------------------------------
+| Rule 4: FoundationModels Framework Load from Unsigned Process
+| Name: apfelbauer - FoundationModels Unsigned Load
+| Description: Detects loading of FoundationModels.framework by unsigned
+|   or non-Apple-signed processes. Requires library/image load telemetry.
+|  
+| Severity: High
+| MITRE ATT&CK: T1059.004 - Unix Shell
+| ----------------------------------------------------------------------------
+
+index=endpoint sourcetype=*endpoint* EventType="ImageLoad"
+  ImageLoaded="*FoundationModels.framework*"
+  NOT process_path IN ("/System/Library/*","/usr/libexec/*")
+  NOT process_name IN ("Siri","siriinferenced","siriactionsd","Shortcuts","Xcode")
+| table _time dest user process_name process_path ImageLoaded
+| sort - _time
+
+
+| ----------------------------------------------------------------------------
+| Rule 5: Swift Interpreter from Non-Xcode Parent
+| Name: apfelbauer - Swift from Non-Xcode Parent
+| Description: Detects /usr/bin/swift invoked by a scripting interpreter or
+|   shell rather than the Xcode toolchain, indicating potential use as a
+|   bridge to FoundationModels.framework.
+| Severity: Medium
+| MITRE ATT&CK: T1059.004 - Unix Shell
+| ----------------------------------------------------------------------------
+
+index=endpoint sourcetype=*endpoint* process_name="swift" process_path="/usr/bin/swift"
+  parent_process_name IN ("python3","python","bash","zsh","sh","ruby","perl","node","osascript")
+  NOT parent_process_path IN ("*/Xcode.app/*","*/xcodebuild","*/xcrun")
+| table _time dest user parent_process_name parent_process_path process_name command_line
+| sort - _time
+
+
+| ----------------------------------------------------------------------------
+| Rule 6: Writes to com.apple.generativeexperiencesd (surface probing indicator)
+| Name: apfelbauer - Writes to generativeexperiencesd Prefs (Probe Indicator)
+| Description: Detects writes to com.apple.generativeexperiencesd preferences.
+|   This preference domain is user-writable, but static analysis of the dylib
+|   that generativeexperiencesd runs (GenerativeExperiencesRuntime on macOS
+|   26.5 Beta) does NOT confirm that any key in this domain (e.g.
+|   disableToolBoxAllowList, inputValidation, safetyMode,
+|   bypassTranscriptWriteRedaction) is read by the daemon. Absent a confirmed
+|   reader, writes here are best treated as a LOW-CONFIDENCE signal of an
+|   attacker probing AI preferences, not proof of safety-control bypass.
+|  
+| Severity: Low
+| MITRE ATT&CK: T1647 - Plist File Modification
+| ----------------------------------------------------------------------------
+
+index=endpoint sourcetype=*endpoint* process_name="defaults"
+  (command_line="*write*" AND command_line="*com.apple.generativeexperiencesd*")
+| table _time dest user parent_process_name process_name command_line
+| sort - _time
+
+
+| ----------------------------------------------------------------------------
+| Rule 7: Rapid Sequential Shell Execution from Swift Interpreter
+| Name: apfelbauer - Rapid Shell Exec from Swift
+| Description: Detects multiple child processes spawned by the Swift
+|   interpreter within a 10-second window, consistent with LLM tool callbacks
+|   executing commands in rapid succession.
+| Severity: Medium
+| MITRE ATT&CK: T1059.004 - Unix Shell
+| ----------------------------------------------------------------------------
+
+index=endpoint sourcetype=*endpoint*
+  parent_process_name="swift" parent_process_path="/usr/bin/swift"
+  process_name IN ("sh","bash","zsh","cat","ls","find","curl","whoami","hostname","env","grep","awk","sed","defaults","security","dscl")
+| bin _time span=10s
+| stats count as exec_count dc(process_name) as unique_cmds values(process_name) as commands values(command_line) as cmdlines by _time dest parent_process_path
+| where exec_count >= 3 AND unique_cmds >= 2
+| sort - _time

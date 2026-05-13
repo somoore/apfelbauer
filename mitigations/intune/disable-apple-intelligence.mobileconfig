@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PayloadContent</key>
+	<array>
+		<!-- Payload 1: Disable Apple Intelligence per-feature restrictions -->
+		<dict>
+			<key>PayloadType</key>
+			<string>com.apple.applicationaccess</string>
+			<key>PayloadIdentifier</key>
+			<string>com.apfelbauer.disable-ai.applicationaccess</string>
+			<key>PayloadUUID</key>
+			<string>826184B4-629E-4987-96C3-75B88FA04CE6</string>
+			<key>PayloadDisplayName</key>
+			<string>Disable Apple Intelligence Features</string>
+			<key>PayloadDescription</key>
+			<string>Disables Apple Intelligence features including the Apple Intelligence Report, Writing Tools, Genmoji, Image Playground, Image Wand, Mail Smart Replies, Mail Summary, and Notifications Summary. Part of apfelbauer defense-in-depth mitigations. Note: Does not prevent direct FoundationModels framework access or unprivileged re-enablement via user-domain defaults writes.</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>PayloadEnabled</key>
+			<true/>
+			<key>allowAppleIntelligenceReport</key>
+			<false/>
+			<key>allowGenmoji</key>
+			<false/>
+			<key>allowImagePlayground</key>
+			<false/>
+			<key>allowImageWand</key>
+			<false/>
+			<key>allowWritingTools</key>
+			<false/>
+			<key>allowMailSmartReplies</key>
+			<false/>
+			<key>allowMailSummary</key>
+			<false/>
+			<key>allowNotificationsSummary</key>
+			<false/>
+		</dict>
+		<!-- Payload 2: Disable Apple Intelligence opt-in preference -->
+		<dict>
+			<key>PayloadType</key>
+			<string>com.apple.ManagedClient.preferences</string>
+			<key>PayloadIdentifier</key>
+			<string>com.apfelbauer.disable-ai.optin-prefs</string>
+			<key>PayloadUUID</key>
+			<string>D7D5FD2A-4EF5-4E48-A1D0-63D385AFED1A</string>
+			<key>PayloadDisplayName</key>
+			<string>Disable Apple Intelligence Opt-In</string>
+			<key>PayloadDescription</key>
+			<string>Sets the Apple Intelligence opt-in preference to disabled via managed preferences. Note: This can be overridden at the user defaults level on unsupervised devices.</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>PayloadEnabled</key>
+			<true/>
+			<key>PayloadContentManagedPreferences</key>
+			<dict>
+				<key>com.apple.CloudSubscriptionFeatures.optIn</key>
+				<dict>
+					<key>Forced</key>
+					<array>
+						<dict>
+							<key>mcx_preference_settings</key>
+							<dict>
+								<key>optIn</key>
+								<false/>
+							</dict>
+						</dict>
+					</array>
+				</dict>
+			</dict>
+		</dict>
+	</array>
+	<key>PayloadDisplayName</key>
+	<string>Disable Apple Intelligence (apfelbauer)</string>
+	<key>PayloadDescription</key>
+	<string>Disables Apple Intelligence features and opt-in preference. Part of apfelbauer defense-in-depth mitigations. IMPORTANT: This profile alone does not prevent the silent re-enablement primitive (user-domain defaults write plus a Darwin notification). Deploy EDR detection rules alongside this profile.</string>
+	<key>PayloadIdentifier</key>
+	<string>com.apfelbauer.disable-apple-intelligence</string>
+	<key>PayloadUUID</key>
+	<string>BD21162D-5234-4249-9F59-F18A07B9F2FD</string>
+	<key>PayloadType</key>
+	<string>Configuration</string>
+	<key>PayloadVersion</key>
+	<integer>1</integer>
+	<key>PayloadScope</key>
+	<string>System</string>
+	<key>PayloadRemovalDisallowed</key>
+	<true/>
+</dict>
+</plist>

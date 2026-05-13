@@ -1,0 +1,51 @@
+[
+  {
+    "name": "apfelbauer: Silent Apple Intelligence Enablement via defaults write",
+    "description": "Detects writes to com.apple.CloudSubscriptionFeatures.optIn via the defaults command, which silently enables Apple Intelligence. This preference is not written by legitimate processes outside of System Settings.",
+    "severity": "Critical",
+    "mitre_attack": "T1562.001",
+    "query": "event_simpleName=ProcessRollup2 ImageFileName=\"*defaults\" CommandLine=\"*write*com.apple.CloudSubscriptionFeatures.optIn*\""
+  },
+  {
+    "name": "apfelbauer: DSID Harvesting via MobileMeAccounts Read",
+    "description": "Detects non-Settings processes reading MobileMeAccounts to extract the DSID for constructing the DSID-keyed Apple Intelligence opt-in key (macOS 26.4+ bypass).",
+    "severity": "High",
+    "mitre_attack": "T1552.001",
+    "query": "event_simpleName=ProcessRollup2 ImageFileName=\"*defaults\" CommandLine=\"*read*MobileMeAccounts*\" ParentBaseFileName!=\"System Settings\" ParentBaseFileName!=\"systempreferences\" ParentBaseFileName!=\"mdmclient\""
+  },
+  {
+    "name": "apfelbauer: Darwin Notification Trigger for AI Enablement",
+    "description": "Detects use of notifyutil to post the CloudSubscriptionFeatures.OptIn.Changed Darwin notification, forcing the daemon to re-evaluate the attacker-written enablement preference.",
+    "severity": "Critical",
+    "mitre_attack": "T1562.001",
+    "query": "event_simpleName=ProcessRollup2 ImageFileName=\"*notifyutil\" CommandLine=\"*-p*com.apple.CloudSubscriptionFeatures.OptIn.Changed*\""
+  },
+  {
+    "name": "apfelbauer: FoundationModels Framework Load from Unsigned Process",
+    "description": "Detects loading of FoundationModels.framework by processes that are not Apple-signed, indicating potential zero-permission LLM abuse.",
+    "severity": "High",
+    "mitre_attack": "T1059.004",
+    "query": "event_simpleName=ImageLoad ImageFileName=\"*FoundationModels.framework*\" ContextProcessId_decimal=* | join ContextProcessId_decimal [search event_simpleName=ProcessRollup2 SignInfoFlags!=*Apple*] | stats count by aid, ImageFileName, ParentImageFileName"
+  },
+  {
+    "name": "apfelbauer: Swift Interpreter from Non-Xcode Parent",
+    "description": "Detects /usr/bin/swift invoked by a scripting interpreter or shell, indicating potential use of Swift as a bridge to FoundationModels.framework for LLM-driven attacks.",
+    "severity": "Medium",
+    "mitre_attack": "T1059.004",
+    "query": "event_simpleName=ProcessRollup2 ImageFileName=\"*/usr/bin/swift\" (ParentBaseFileName=python3 OR ParentBaseFileName=python OR ParentBaseFileName=bash OR ParentBaseFileName=zsh OR ParentBaseFileName=sh OR ParentBaseFileName=ruby OR ParentBaseFileName=perl OR ParentBaseFileName=node OR ParentBaseFileName=osascript) GrandparentImageFileName!=\"*Xcode*\" GrandparentImageFileName!=\"*xcodebuild*\""
+  },
+  {
+    "name": "apfelbauer: Writes to generativeexperiencesd Prefs (Probe Indicator)",
+    "description": "Detects writes to com.apple.generativeexperiencesd preferences. This preference domain is user-writable, but static analysis of the dylib the daemon runs (GenerativeExperiencesRuntime, macOS 26.5 Beta) does NOT confirm any key in this domain (e.g. disableToolBoxAllowList, inputValidation, safetyMode, bypassTranscriptWriteRedaction) is read by the daemon. Treat as a LOW-CONFIDENCE indicator of an attacker probing AI preferences, not a confirmed safety-control bypass.",
+    "severity": "Low",
+    "mitre_attack": "T1647",
+    "query": "event_simpleName=ProcessRollup2 ImageFileName=\"*defaults\" CommandLine=\"*write*com.apple.generativeexperiencesd*\""
+  },
+  {
+    "name": "apfelbauer: Rapid Sequential Shell Execution from Swift",
+    "description": "Detects multiple child processes spawned rapidly by the Swift interpreter, consistent with LLM tool callbacks executing commands in sequence.",
+    "severity": "Medium",
+    "mitre_attack": "T1059.004",
+    "query": "event_simpleName=ProcessRollup2 ParentImageFileName=\"*/usr/bin/swift\" (ImageFileName=\"*/bin/sh\" OR ImageFileName=\"*/bin/bash\" OR ImageFileName=\"*/bin/zsh\" OR ImageFileName=\"*/usr/bin/cat\" OR ImageFileName=\"*/usr/bin/ls\" OR ImageFileName=\"*/usr/bin/find\" OR ImageFileName=\"*/usr/bin/curl\" OR ImageFileName=\"*/usr/bin/whoami\" OR ImageFileName=\"*/bin/hostname\" OR ImageFileName=\"*/usr/bin/env\" OR ImageFileName=\"*/usr/bin/defaults\" OR ImageFileName=\"*/usr/bin/security\" OR ImageFileName=\"*/usr/bin/dscl\") | stats dc(ImageFileName) as unique_cmds count as total_execs by aid, ParentProcessId_decimal | where total_execs >= 3 AND unique_cmds >= 2"
+  }
+]

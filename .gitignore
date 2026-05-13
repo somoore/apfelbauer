@@ -1,0 +1,130 @@
+# =============================================================================
+# apfelbauer — Living off the land in the Apple orchard
+# =============================================================================
+
+# ── macOS ──
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# ── Windows ──
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# ── Linux ──
+*~
+.directory
+.Trash-*
+.nfs*
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+*.whl
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.local
+pip-log.txt
+pip-delete-this-directory.txt
+.Python
+develop-eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.manifest
+*.spec
+.installed.cfg
+
+# ── Node.js / GitHub Pages ──
+node_modules/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+package-lock.json
+yarn.lock
+.hugo_build.lock
+
+# ── IDE / Editor ──
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+.spyproject/
+
+# ── Swift / Xcode ──
+*.o
+*.swiftmodule
+*.swiftdoc
+*.swiftsourceinfo
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+*.playground/
+
+# ── Research artifacts (demo output) ──
+lotl-demo-output*
+lotl-cli-output*
+_lotl_demo_result.json
+*.jsonl
+/tmp/lotl-*
+
+# ── Security ──
+*.pem
+*.key
+*.cert
+*.p12
+credentials*
+secrets*
+
+# ── Local-only artifacts (not for publication) ──
+research/
+findings/
+TIMELINE.md
+demo/
+
+# ── Claude Code local settings ──
+.claude/
+
+# ── LinkedIn draft (not for publication in repo) ──
+linkedin/

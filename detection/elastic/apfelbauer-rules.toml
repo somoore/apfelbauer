@@ -1,0 +1,301 @@
+# =============================================================================
+# apfelbauer Detection Rules for Elastic Security
+# Targeting Apple Intelligence enablement primitives and related framework-access patterns
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Rule 1: Silent Apple Intelligence Enablement via defaults write
+# -----------------------------------------------------------------------------
+[[rule]]
+name = "apfelbauer: Silent Apple Intelligence Enablement via defaults write"
+description = """Detects writes to com.apple.CloudSubscriptionFeatures.optIn via the defaults command, \
+which silently enables Apple Intelligence. This preference is not written by legitimate processes \
+outside of System Settings."""
+severity = "critical"
+risk_score = 99
+type = "eql"
+language = "eql"
+index = ["logs-endpoint.events.*"]
+tags = ["apfelbauer", "macOS-AI", "macOS", "Apple Intelligence"]
+
+  [rule.query]
+  query = '''
+  process where event.type == "start" and
+    process.name == "defaults" and
+    process.args : "write" and
+    process.args : "*com.apple.CloudSubscriptionFeatures.optIn*"
+  '''
+
+  [[rule.threat]]
+  framework = "MITRE ATT&CK"
+
+    [rule.threat.tactic]
+    name = "Defense Evasion"
+    id = "TA0005"
+    reference = "https://attack.mitre.org/tactics/TA0005/"
+
+    [[rule.threat.technique]]
+    name = "Impair Defenses"
+    id = "T1562"
+    reference = "https://attack.mitre.org/techniques/T1562/"
+
+      [[rule.threat.technique.subtechnique]]
+      name = "Disable or Modify Tools"
+      id = "T1562.001"
+      reference = "https://attack.mitre.org/techniques/T1562/001/"
+
+# -----------------------------------------------------------------------------
+# Rule 2: DSID Harvesting via MobileMeAccounts Read
+# -----------------------------------------------------------------------------
+[[rule]]
+name = "apfelbauer: DSID Harvesting via MobileMeAccounts Read"
+description = """Detects non-Settings processes reading MobileMeAccounts preferences to extract the DSID, \
+used to construct the DSID-keyed opt-in key for the Apple Intelligence enablement bypass on macOS 26.4+. \
+"""
+severity = "high"
+risk_score = 73
+type = "eql"
+language = "eql"
+index = ["logs-endpoint.events.*"]
+tags = ["apfelbauer", "macOS-AI", "macOS", "DSID"]
+
+  [rule.query]
+  query = '''
+  process where event.type == "start" and
+    process.name == "defaults" and
+    process.args : "read" and
+    process.args : "*MobileMeAccounts*" and
+    not process.parent.name : ("System Settings", "systempreferences", "ManagedClient", "mdmclient")
+  '''
+
+  [[rule.threat]]
+  framework = "MITRE ATT&CK"
+
+    [rule.threat.tactic]
+    name = "Credential Access"
+    id = "TA0006"
+    reference = "https://attack.mitre.org/tactics/TA0006/"
+
+    [[rule.threat.technique]]
+    name = "Unsecured Credentials"
+    id = "T1552"
+    reference = "https://attack.mitre.org/techniques/T1552/"
+
+      [[rule.threat.technique.subtechnique]]
+      name = "Credentials in Files"
+      id = "T1552.001"
+      reference = "https://attack.mitre.org/techniques/T1552/001/"
+
+# -----------------------------------------------------------------------------
+# Rule 3: Darwin Notification Trigger for AI Enablement
+# -----------------------------------------------------------------------------
+[[rule]]
+name = "apfelbauer: Darwin Notification Trigger for AI Enablement"
+description = """Detects use of notifyutil to post the CloudSubscriptionFeatures.OptIn.Changed Darwin \
+notification, which forces the daemon to re-evaluate the attacker-written enablement preference. \
+"""
+severity = "critical"
+risk_score = 99
+type = "eql"
+language = "eql"
+index = ["logs-endpoint.events.*"]
+tags = ["apfelbauer", "macOS-AI", "macOS", "Apple Intelligence"]
+
+  [rule.query]
+  query = '''
+  process where event.type == "start" and
+    process.name == "notifyutil" and
+    process.args : "-p" and
+    process.args : "*com.apple.CloudSubscriptionFeatures.OptIn.Changed*"
+  '''
+
+  [[rule.threat]]
+  framework = "MITRE ATT&CK"
+
+    [rule.threat.tactic]
+    name = "Defense Evasion"
+    id = "TA0005"
+    reference = "https://attack.mitre.org/tactics/TA0005/"
+
+    [[rule.threat.technique]]
+    name = "Impair Defenses"
+    id = "T1562"
+    reference = "https://attack.mitre.org/techniques/T1562/"
+
+      [[rule.threat.technique.subtechnique]]
+      name = "Disable or Modify Tools"
+      id = "T1562.001"
+      reference = "https://attack.mitre.org/techniques/T1562/001/"
+
+# -----------------------------------------------------------------------------
+# Rule 4: FoundationModels Framework Load from Unsigned Process
+# -----------------------------------------------------------------------------
+[[rule]]
+name = "apfelbauer: FoundationModels Framework Load from Unsigned Process"
+description = """Detects loading of FoundationModels.framework by processes that are not Apple-signed. \
+The framework provides zero-permission on-device LLM access with tool execution capability. \
+Requires library load event collection."""
+severity = "high"
+risk_score = 73
+type = "eql"
+language = "eql"
+index = ["logs-endpoint.events.*"]
+tags = ["apfelbauer", "macOS-AI", "macOS", "FoundationModels"]
+
+  [rule.query]
+  query = '''
+  library where
+    dll.path : "*FoundationModels.framework*" and
+    not process.code_signature.subject_name : "Apple*" and
+    not process.name : ("Siri", "siriinferenced", "siriactionsd", "Shortcuts", "Xcode")
+  '''
+
+  [[rule.threat]]
+  framework = "MITRE ATT&CK"
+
+    [rule.threat.tactic]
+    name = "Execution"
+    id = "TA0002"
+    reference = "https://attack.mitre.org/tactics/TA0002/"
+
+    [[rule.threat.technique]]
+    name = "Command and Scripting Interpreter"
+    id = "T1059"
+    reference = "https://attack.mitre.org/techniques/T1059/"
+
+      [[rule.threat.technique.subtechnique]]
+      name = "Unix Shell"
+      id = "T1059.004"
+      reference = "https://attack.mitre.org/techniques/T1059/004/"
+
+# -----------------------------------------------------------------------------
+# Rule 5: Swift Interpreter from Non-Xcode Parent
+# -----------------------------------------------------------------------------
+[[rule]]
+name = "apfelbauer: Swift Interpreter from Non-Xcode Parent"
+description = """Detects /usr/bin/swift invoked by a scripting interpreter or shell rather than the Xcode \
+toolchain. This pattern is used to bridge from a malicious script into FoundationModels.framework \
+for LLM-driven attacks."""
+severity = "medium"
+risk_score = 47
+type = "eql"
+language = "eql"
+index = ["logs-endpoint.events.*"]
+tags = ["apfelbauer", "macOS-AI", "macOS", "Swift"]
+
+  [rule.query]
+  query = '''
+  process where event.type == "start" and
+    process.name == "swift" and
+    process.executable == "/usr/bin/swift" and
+    process.parent.name : ("python3", "python", "bash", "zsh", "sh", "ruby", "perl", "node", "osascript") and
+    not process.parent.executable : ("*/Xcode.app/*", "*/xcodebuild", "*/xcrun")
+  '''
+
+  [[rule.threat]]
+  framework = "MITRE ATT&CK"
+
+    [rule.threat.tactic]
+    name = "Execution"
+    id = "TA0002"
+    reference = "https://attack.mitre.org/tactics/TA0002/"
+
+    [[rule.threat.technique]]
+    name = "Command and Scripting Interpreter"
+    id = "T1059"
+    reference = "https://attack.mitre.org/techniques/T1059/"
+
+      [[rule.threat.technique.subtechnique]]
+      name = "Unix Shell"
+      id = "T1059.004"
+      reference = "https://attack.mitre.org/techniques/T1059/004/"
+
+# -----------------------------------------------------------------------------
+# Rule 6: Writes to com.apple.generativeexperiencesd (surface probing indicator)
+# -----------------------------------------------------------------------------
+[[rule]]
+name = "apfelbauer: Writes to generativeexperiencesd Prefs (Probe Indicator)"
+description = """Detects writes to com.apple.generativeexperiencesd preferences. This preference domain is \
+user-writable, but static analysis of the dylib the daemon runs (GenerativeExperiencesRuntime on macOS 26.5 \
+Beta) does NOT confirm that any key in this domain (e.g. disableToolBoxAllowList, inputValidation, safetyMode, \
+bypassTranscriptWriteRedaction) is read by the daemon. Absent a confirmed reader, writes here should be \
+treated as a LOW-CONFIDENCE indicator of attacker surface-probing, not as a confirmed safety-control bypass. \
+"""
+severity = "low"
+risk_score = 21
+type = "eql"
+language = "eql"
+index = ["logs-endpoint.events.*"]
+tags = ["apfelbauer", "macOS-AI", "macOS", "Safety Controls"]
+
+  [rule.query]
+  query = '''
+  process where event.type == "start" and
+    process.name == "defaults" and
+    process.args : "write" and
+    process.args : "*com.apple.generativeexperiencesd*"
+  '''
+
+  [[rule.threat]]
+  framework = "MITRE ATT&CK"
+
+    [rule.threat.tactic]
+    name = "Defense Evasion"
+    id = "TA0005"
+    reference = "https://attack.mitre.org/tactics/TA0005/"
+
+    [[rule.threat.technique]]
+    name = "Plist File Modification"
+    id = "T1647"
+    reference = "https://attack.mitre.org/techniques/T1647/"
+
+# -----------------------------------------------------------------------------
+# Rule 7: Rapid Sequential Shell Execution from Swift Interpreter
+# -----------------------------------------------------------------------------
+[[rule]]
+name = "apfelbauer: Rapid Sequential Shell Execution from Swift Interpreter"
+description = """Detects a sequence of three or more child processes spawned by the Swift interpreter \
+within a short time window, consistent with LLM tool callbacks executing commands in rapid \
+succession during an AI-driven attack."""
+severity = "medium"
+risk_score = 47
+type = "eql"
+language = "eql"
+index = ["logs-endpoint.events.*"]
+tags = ["apfelbauer", "macOS-AI", "macOS", "Tool Callbacks"]
+
+  [rule.query]
+  query = '''
+  sequence by process.parent.entity_id with maxspan=10s
+    [process where event.type == "start" and
+      process.parent.name == "swift" and
+      process.parent.executable == "/usr/bin/swift" and
+      process.name : ("sh", "bash", "zsh", "cat", "ls", "find", "curl", "whoami",
+                       "hostname", "env", "grep", "awk", "sed", "defaults", "security", "dscl")]
+    [process where event.type == "start" and
+      process.parent.name == "swift" and
+      process.name : ("sh", "bash", "zsh", "cat", "ls", "find", "curl", "whoami",
+                       "hostname", "env", "grep", "awk", "sed", "defaults", "security", "dscl")]
+    [process where event.type == "start" and
+      process.parent.name == "swift" and
+      process.name : ("sh", "bash", "zsh", "cat", "ls", "find", "curl", "whoami",
+                       "hostname", "env", "grep", "awk", "sed", "defaults", "security", "dscl")]
+  '''
+
+  [[rule.threat]]
+  framework = "MITRE ATT&CK"
+
+    [rule.threat.tactic]
+    name = "Execution"
+    id = "TA0002"
+    reference = "https://attack.mitre.org/tactics/TA0002/"
+
+    [[rule.threat.technique]]
+    name = "Command and Scripting Interpreter"
+    id = "T1059"
+    reference = "https://attack.mitre.org/techniques/T1059/"
+
+      [[rule.threat.technique.subtechnique]]
+      name = "Unix Shell"
+      id = "T1059.004"
+      reference = "https://attack.mitre.org/techniques/T1059/004/"
